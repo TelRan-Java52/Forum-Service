@@ -21,7 +21,7 @@ import telran.java52.accounting.model.UserAccount;
 public class UserAccountingServiceImpl implements UserAccountService {
 	final UserAccountingRepository userAccountingRepository;
 	final ModelMapper modelMapper;
-	//
+
 	@Override
 	public UserDto register(UserRegisterDto userRegisterDto) {
 		UserAccount user = modelMapper.map(userRegisterDto, UserAccount.class);
