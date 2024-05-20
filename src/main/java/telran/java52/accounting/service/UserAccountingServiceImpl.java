@@ -106,7 +106,7 @@ public class UserAccountingServiceImpl implements UserAccountService, CommandLin
 	public void run(String... args) throws Exception {
 		if (!userAccountingRepository.existsById("admin")) {
 			UserAccount userAccount = new UserAccount("admin","","",password);
-		//to do
+		//to do//
 		}
 		
 	}
