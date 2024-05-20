@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import org.mindrot.jbcrypt.BCrypt;
 import org.modelmapper.ModelMapper;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
 import org.springframework.http.HttpStatus;
@@ -23,7 +24,7 @@ import telran.java52.accounting.model.UserAccount;
 
 @Service
 @RequiredArgsConstructor
-public class UserAccountingServiceImpl implements UserAccountService {
+public class UserAccountingServiceImpl implements UserAccountService, CommandLineRunner {
 	final UserAccountingRepository userAccountingRepository;
 	final ModelMapper modelMapper;
 	
@@ -99,6 +100,15 @@ public class UserAccountingServiceImpl implements UserAccountService {
 		user.setPassword(newPassword);
 
 		userAccountingRepository.save(user);
+	}
+
+	@Override
+	public void run(String... args) throws Exception {
+		if (!userAccountingRepository.existsById("admin")) {
+			UserAccount userAccount = new UserAccount("admin","","",password);
+		//to do
+		}
+		
 	}
 
 	}
