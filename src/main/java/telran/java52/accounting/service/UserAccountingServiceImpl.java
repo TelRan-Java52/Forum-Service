@@ -4,8 +4,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.modelmapper.ModelMapper;
-
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import lombok.RequiredArgsConstructor;
 import telran.java52.accounting.dao.UserAccountingRepository;
@@ -24,6 +27,10 @@ public class UserAccountingServiceImpl implements UserAccountService {
 	
 	@Override
 	public UserDto register(UserRegisterDto userRegisterDto) {
+		
+		if (userAccountingRepository.existsById(userRegisterDto.getLogin())) {
+	        throw new ResponseStatusException(HttpStatus.CONFLICT, "User with email " + userRegisterDto.getLogin() + " already exists");
+	    }
 		UserAccount user = modelMapper.map(userRegisterDto, UserAccount.class);
            user = userAccountingRepository.save(user);
            return  modelMapper.map(user, UserDto.class);
