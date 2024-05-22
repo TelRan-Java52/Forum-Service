@@ -20,6 +20,7 @@ import telran.java52.accounting.dto.UserDto;
 import telran.java52.accounting.dto.UserEditDto;
 import telran.java52.accounting.dto.UserRegisterDto;
 import telran.java52.accounting.dto.exeption.IncorrectRoleExeption;
+import telran.java52.accounting.model.Role;
 import telran.java52.accounting.model.UserAccount;
 
 @Service
@@ -105,10 +106,12 @@ public class UserAccountingServiceImpl implements UserAccountService, CommandLin
 	@Override
 	public void run(String... args) throws Exception {
 		if (!userAccountingRepository.existsById("admin")) {
-			UserAccount userAccount = new UserAccount("admin","","",password);
-		//to do//
+			String password = BCrypt.hashpw("admin", BCrypt.gensalt());
+			UserAccount userAccount = new UserAccount("admin", "", "", password);
+			userAccount.addRole(Role.MODERATOR.name());
+			userAccount.addRole(Role.ADMINISTRATOR.name());
+			userAccountingRepository.save(userAccount);
 		}
-		
 	}
 
 	}
