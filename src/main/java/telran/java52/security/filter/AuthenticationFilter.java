@@ -9,6 +9,7 @@ import javax.management.loading.PrivateClassLoader;
 import org.apache.catalina.connector.Response;
 import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 
 import jakarta.servlet.Filter;
@@ -34,64 +35,52 @@ public class AuthenticationFilter implements Filter {
 	@Override
 	public void doFilter(ServletRequest req, ServletResponse resp, FilterChain chain)
 			throws IOException, ServletException {
-
-		HttpServletRequest request = (HttpServletRequest) req;
-		HttpServletResponse response = (HttpServletResponse) resp;
-
-//		System.out.println("request:");
-//		System.out.println("Path "+request.getServletPath());
-//		System.out.println("Method "+request.getMethod());
-//		
-//		System.out.println("дотуп к заголовкам");
-//		System.out.println("Authorization: "+request.getHeader("Authorization"));
-
-		if (checkEndpoint(request.getMethod(),request.getServletPath())) {
+		HttpServletRequest request = (HttpServletRequest) req;// Преобразование общего ServletRequest в HttpServletRequest
+		HttpServletResponse response = (HttpServletResponse) resp;// Преобразование общего ServletResponse в HttpServletResponse
+		// Проверка, нужно ли применять фильтр для данного запроса
+		if (checkEndpoint(request.getMethod(), request.getServletPath())) {
 			try {
-				String[] credential = getCredentials(request.getHeader("Authorization"));
-				// пароль который при входе на сайт прилетел
-				// System.out.println("login " + credential[0] + ", password " + credential[1]);
-
-				UserAccount userAccount = userAccountingRepository.findById(credential[0])
+				// Извлечение учетных данных из заголовка Authorization
+				String[] credentials = getCredentials(request.getHeader("Authorization"));
+				UserAccount userAccount = userAccountingRepository.findById(credentials[0])// Поиск пользователя по логину, если не найден - выбрасывается исключение
 						.orElseThrow(RuntimeException::new);
-				// найти пользователя в базе для проверки пароля
-
-				if (!BCrypt.checkpw(credential[1], userAccount.getPassword())) {
-					// если не совпадают пароли то дальше не пускаем
-					throw new RuntimeException(); // бросаем ошибку
+				// Проверка пароля пользователя с использованием BCrypt
+				if (!BCrypt.checkpw(credentials[1], userAccount.getPassword())) {
+					throw new RuntimeException();
 				}
-				request = new WrappedRequest(request, userAccount.getLogin());
-				// сделать нормальный Principal с логином и паролем
+				request = new WrappedRequest(request, userAccount.getLogin());// Создание обертки для запроса с информацией о пользователе
 			} catch (Exception e) {
-				response.sendError(401); // все возможные ошибки ловим тут и пробрасываем 401-ю "Unauthorized"
-				return; // и выходим
+				response.sendError(401);
+				return;
 			} 
 		}
-		chain.doFilter(request, response); // если все было ок то пробросить данные дальше
+		chain.doFilter(request, response);// Передача запроса следующему фильтру в цепочке
 	}
 
-	private boolean checkEndpoint(String method, String servletPath) {
-		//to do
-		return false;
-	}
+	private boolean checkEndpoint(String method, String path) {
+		return !(HttpMethod.POST.matches(method) && path.matches("/account/register"));
+	}// Проверка, если метод POST и путь /account/register, фильтр не применяется
 
 	private String[] getCredentials(String header) {
-		String token = header.split(" ")[1]; // закодированый логин и пароль без "Base "
-		String decode = new String(Base64.getDecoder().decode(token)); // раскодировать в "login:password"
-		return decode.split(":"); // сделать массив из логина и пароля, [0] - логин, [1] - пароль
+		String token = header.split(" ")[1];// Извлечение токена из заголовка Authorization
+		String decode = new String(Base64.getDecoder().decode(token));// Декодирование токена из Base64
+		return decode.split(":");// Разделение декодированного токена на логин и пароль
 	}
-
+	
+	// Класс обертка для HttpServletRequest
 	private class WrappedRequest extends HttpServletRequestWrapper {
-		// класс для того чтобы сделать нормальный Principal
 		private String login;
 
 		public WrappedRequest(HttpServletRequest request, String login) {
-			super(request);
-			this.login = login;
+			super(request);// Вызов конструктора родительского класса
+			this.login = login;// Сохранение логина пользователя
 		}
 
 		@Override
 		public Principal getUserPrincipal() {
-		    return () -> login;
+			return () -> login;// Возврат Principal с логином пользователя
 		}
+
 	}
+
 }
