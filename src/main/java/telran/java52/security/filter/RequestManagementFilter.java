@@ -33,44 +33,44 @@ public class RequestManagementFilter implements Filter{
 	public void doFilter(ServletRequest request, ServletResponse resp, FilterChain chain)
 			throws IOException, ServletException {
 		
-		    HttpServletRequest request = (HttpServletRequest) req;
-	        HttpServletResponse response = (HttpServletResponse) resp;
+		HttpServletRequest request1 = (HttpServletRequest) request;
+	    HttpServletResponse response = (HttpServletResponse) resp;
 
-	        // Получение информации о методе запроса и пути
-	        String method = request.getMethod();
-	        String path = request.getServletPath();
+	    // Получение информации о методе запроса и пути
+	    String method = request1.getMethod();
+	    String path = request1.getServletPath();
 
-	        // Проверка, соответствует ли путь шаблону управления аккаунтами
-	        if (checkEndpoint(method, path)) {
-	            try {
-	                // Извлечение имени пользователя из запроса
-	                String username = request.getUserPrincipal().getName();
+	    // Проверка, соответствует ли путь шаблону управления аккаунтами
+	    if (checkEndpoint(method, path)) {
+	        try {
+	            // Извлечение имени пользователя из запроса
+	            String username = request1.getUserPrincipal().getName();
 
-	                // Получение пользователя из базы данных по имени пользователя
-	                UserAccount user = userAccountingRepository.findById(username)
-	                        .orElseThrow(UserNotFoundException::new);
+	            // Получение пользователя из базы данных по имени пользователя
+	            UserAccount user = userAccountingRepository.findById(username)
+	                    .orElseThrow(UserNotFoundException::new);
 
-	                // Проверка, имеет ли пользователь права на выполнение операции
-	                if (!isAdmin(user.getRoles())) {
-	                    // Если пользователь не является администратором, возвращаем ошибку доступа
-	                    response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
-	                    return;
-	                }
-
-	            } catch (UserNotFoundException e) {
-	                // Если пользователь не найден, возвращаем ошибку
-	                response.sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
-	                return;
-	            } catch (Exception e) {
-	                // В случае других ошибок возвращаем ошибку сервера
-	                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal server error");
+	            // Проверка, имеет ли пользователь права на выполнение операции
+	            if (!isAdmin(user.getRoles())) {
+	                // Если пользователь не является администратором, возвращаем ошибку доступа
+	                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
 	                return;
 	            }
-	        }
 
-	        // Передача запроса следующему фильтру в цепочке
-	        chain.doFilter(request, response);
+	        } catch (UserNotFoundException e) {
+	            // Если пользователь не найден, возвращаем ошибку
+	            response.sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
+	            return;
+	        } catch (Exception e) {
+	            // В случае других ошибок возвращаем ошибку сервера
+	            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal server error");
+	            return;
+	        }
 	    }
+
+	    // Передача запроса следующему фильтру в цепочке
+	    chain.doFilter(request1, response);
+	}
 
 	    private boolean checkEndpoint(String method, String path) {
 	    	// Паттерн для проверки пути на соответствие шаблону управления аккаунтами
@@ -81,7 +81,7 @@ public class RequestManagementFilter implements Filter{
 	                && accountManagementPattern.matcher(path).matches();
 	}
 
-		// Проверка, является ли пользователь администратором
+		
 	    private boolean isAdmin(Set<Role> roles) {
 	        return roles.contains(Role.ADMINISTRATOR);
 	    }}

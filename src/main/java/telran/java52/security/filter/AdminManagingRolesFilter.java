@@ -1,3 +1,4 @@
+
 package telran.java52.security.filter;
 
 import java.io.IOException;
@@ -41,29 +42,35 @@ public class AdminManagingRolesFilter implements Filter {
         HttpServletRequest request = (HttpServletRequest) req;
         HttpServletResponse response = (HttpServletResponse) resp;
 
-        // Получаем имя пользователя из запроса
-        String login = request.getUserPrincipal().getName();
+        Principal principal = request.getUserPrincipal();
+        if (principal != null) {
+            String login = principal.getName();
 
-        // Пытаемся найти пользователя в базе данных
-        UserAccount user = null;
-        try {
-            user = userAccountingRepository.findById(login)
-                    .orElseThrow(UserNotFoundException::new);
-        } catch (UserNotFoundException e) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
-            return;
+            // Пытаемся найти пользователя в базе данных
+            UserAccount user = null;
+            try {
+                user = userAccountingRepository.findById(login)
+                        .orElseThrow(UserNotFoundException::new);
+            } catch (UserNotFoundException e) {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
+                return;
+            }
+
+            // Проверяем роли пользователя
+            Set<Role> roles = user.getRoles();
+            if (!isAdmin(roles)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
+                return;
+            }
+
+            // Если пользователь администратор, продолжаем выполнение цепочки фильтров
+            chain.doFilter(request, response);
+        } else {
+            // Обработка случая, когда пользователь не аутентифицирован
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User not authenticated");
         }
-
-        // Проверяем роли пользователя
-        Set<Role> roles = user.getRoles();
-        if (!isAdmin(roles)) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
-            return;
-        }
-
-        // Если пользователь администратор, продолжаем выполнение цепочки фильтров
-        chain.doFilter(request, response);
     }
+
 
     // Проверка, является ли пользователь администратором
     private boolean isAdmin(Set<Role> roles) {
