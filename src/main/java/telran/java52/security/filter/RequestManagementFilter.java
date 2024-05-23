@@ -17,6 +17,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import telran.java52.accounting.dao.UserAccountingRepository;
+import telran.java52.accounting.dto.exeption.AccessDeniedException;
 import telran.java52.accounting.model.Role;
 import telran.java52.accounting.model.UserAccount;
 import telran.java52.accounting.service.UserNotFoundException;
@@ -24,64 +25,69 @@ import telran.java52.accounting.service.UserNotFoundException;
 @Component
 @RequiredArgsConstructor
 @Order(30)
-public class RequestManagementFilter implements Filter{
-	
+public class RequestManagementFilter implements Filter {
+
 	final UserAccountingRepository userAccountingRepository;
-	
-	
+
 	@Override
-	public void doFilter(ServletRequest request, ServletResponse resp, FilterChain chain)
+	public void doFilter(ServletRequest req, ServletResponse resp, FilterChain chain)
 			throws IOException, ServletException {
+
+		HttpServletRequest request = (HttpServletRequest) req;
+		HttpServletResponse response = (HttpServletResponse) resp;
+
+		String method = request.getMethod();
+		String path = request.getServletPath();
 		
-		HttpServletRequest request1 = (HttpServletRequest) request;
-	    HttpServletResponse response = (HttpServletResponse) resp;
+		if (checkEndpoint(method, path)) {
+			try {
 
-	    // Получение информации о методе запроса и пути
-	    String method = request1.getMethod();
-	    String path = request1.getServletPath();
+				String userName = path.substring(path.lastIndexOf('/') + 1);
+				String login = request.getUserPrincipal().getName();
 
-	    // Проверка, соответствует ли путь шаблону управления аккаунтами
-	    if (checkEndpoint(method, path)) {
-	        try {
-	            // Извлечение имени пользователя из запроса
-	            String username = request1.getUserPrincipal().getName();
+				UserAccount user = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
 
-	            // Получение пользователя из базы данных по имени пользователя
-	            UserAccount user = userAccountingRepository.findById(username)
-	                    .orElseThrow(UserNotFoundException::new);
+				if (HttpMethod.PUT.matches(method) && !isOwner(login, userName)) {
+					throw new AccessDeniedException();
+				}
+				if (HttpMethod.DELETE.matches(method)
+						&& !(isOwner(login, userName) || isAdmin(user.getRoles()))) {
+					throw new AccessDeniedException();
+				}
+			} catch (UserNotFoundException e) {
+				
+				response.sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
+				return;
+			} catch (AccessDeniedException e) {
+				response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
+				return;
 
-	            // Проверка, имеет ли пользователь права на выполнение операции
-	            if (!isAdmin(user.getRoles())) {
-	                // Если пользователь не является администратором, возвращаем ошибку доступа
-	                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
-	                return;
-	            }
+			} catch (Exception e) {
+			
+				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal server error");
+				return;
+			}
+		}
 
-	        } catch (UserNotFoundException e) {
-	            // Если пользователь не найден, возвращаем ошибку
-	            response.sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
-	            return;
-	        } catch (Exception e) {
-	            // В случае других ошибок возвращаем ошибку сервера
-	            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal server error");
-	            return;
-	        }
-	    }
-
-	    // Передача запроса следующему фильтру в цепочке
-	    chain.doFilter(request1, response);
+		// Передача запроса следующему фильтру в цепочке
+		chain.doFilter(request, response);
 	}
 
-	    private boolean checkEndpoint(String method, String path) {
-	    	// Паттерн для проверки пути на соответствие шаблону управления аккаунтами
-	        Pattern accountManagementPattern = Pattern.compile("^/account/user/[^/]+$");
+	private boolean checkEndpoint(String method, String path) {
 
-	        // Проверка метода запроса (PUT или DELETE) и соответствия пути шаблону управления аккаунтами
-	        return (HttpMethod.PUT.matches(method) || HttpMethod.DELETE.matches(method))
-	                && accountManagementPattern.matcher(path).matches();
+		Pattern accountManagementPattern = Pattern.compile("^/account/user/[^/]+$");
+
+		// Проверка метода запроса (PUT или DELETE) и соответствия пути шаблону
+		// управления аккаунтами
+		return (HttpMethod.PUT.matches(method) || HttpMethod.DELETE.matches(method))
+				&& accountManagementPattern.matcher(path).matches();
 	}
 
-		
-	    private boolean isAdmin(Set<Role> roles) {
-	        return roles.contains(Role.ADMINISTRATOR);
-	    }}
+	private boolean isOwner(String login, String userName) {
+		return login.equalsIgnoreCase(userName);
+	}
+
+	private boolean isAdmin(Set<Role> roles) {
+		return roles.contains(Role.ADMINISTRATOR);
+	}
+}

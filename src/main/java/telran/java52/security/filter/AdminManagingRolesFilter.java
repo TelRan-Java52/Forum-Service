@@ -4,9 +4,12 @@ package telran.java52.security.filter;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.parsing.PassThroughSourceExtractor;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 
 import jakarta.servlet.Filter;
@@ -16,67 +19,70 @@ import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
+import lombok.RequiredArgsConstructor;
 import telran.java52.accounting.dao.UserAccountingRepository;
+import telran.java52.accounting.dto.exeption.AccessDeniedException;
 import telran.java52.accounting.model.Role;
 import telran.java52.accounting.model.UserAccount;
 import telran.java52.accounting.service.UserNotFoundException;
 
 @Component
+@RequiredArgsConstructor
 @Order(20)
 public class AdminManagingRolesFilter implements Filter {
-	
+
 	final UserAccountingRepository userAccountingRepository;
-	 
-	@Autowired
-	public AdminManagingRolesFilter(UserAccountingRepository userAccountingRepository) {
-		super();
-		this.userAccountingRepository = userAccountingRepository;
-	}
-	
-    @Override
+
+	@Override
 	public void doFilter(ServletRequest req, ServletResponse resp, FilterChain chain)
 			throws IOException, ServletException {
-		
 
-        HttpServletRequest request = (HttpServletRequest) req;
-        HttpServletResponse response = (HttpServletResponse) resp;
+		HttpServletRequest request = (HttpServletRequest) req;
+		HttpServletResponse response = (HttpServletResponse) resp;
 
-        Principal principal = request.getUserPrincipal();
-        if (principal != null) {
-            String login = principal.getName();
+		String method = request.getMethod();
+		String path = request.getServletPath();
 
-            // Пытаемся найти пользователя в базе данных
-            UserAccount user = null;
-            try {
-                user = userAccountingRepository.findById(login)
-                        .orElseThrow(UserNotFoundException::new);
-            } catch (UserNotFoundException e) {
-                response.sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
-                return;
-            }
+		if (checkEndpoint(method, path)) {
 
-            // Проверяем роли пользователя
-            Set<Role> roles = user.getRoles();
-            if (!isAdmin(roles)) {
-                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
-                return;
-            }
+			String login = request.getUserPrincipal().getName();
+			// Пытаемся найти пользователя в базе данных
+			UserAccount user = null;
+			try {
+				user = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
 
-            // Если пользователь администратор, продолжаем выполнение цепочки фильтров
-            chain.doFilter(request, response);
-        } else {
-            // Обработка случая, когда пользователь не аутентифицирован
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User not authenticated");
-        }
-    }
+				Set<Role> roles = user.getRoles();
+				if (!isAdmin(roles)) {
+					throw new AccessDeniedException();
+				}
 
+			} catch (UserNotFoundException e) {
+				response.sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
+				return;
+			} catch (AccessDeniedException e) {
+				response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
+				return;
 
-    // Проверка, является ли пользователь администратором
-    private boolean isAdmin(Set<Role> roles) {
-        return roles.contains(Role.ADMINISTRATOR);
-    }
+			}
 
+			
+		}
+		// Если пользователь администратор, продолжаем выполнение цепочки фильтров
+					chain.doFilter(request, response);
 	}
 
+	private boolean checkEndpoint(String method, String path) {
+		
+		Pattern accountManagementPattern = Pattern
+				.compile("(?i)^/account/user/[^/]+/role/(ADMINISTRATOR|MODERATOR|USER)$");
 
+				return (HttpMethod.PUT.matches(method) || HttpMethod.DELETE.matches(method))
+				&& accountManagementPattern.matcher(path).matches();
+	}
+
+	
+	private boolean isAdmin(Set<Role> roles) {
+		return roles.contains(Role.ADMINISTRATOR);
+	}
+
+}
