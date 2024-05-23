@@ -69,7 +69,7 @@ public class RequestManagementFilter implements Filter {
 			}
 		}
 
-		// Передача запроса следующему фильтру в цепочке
+		
 		chain.doFilter(request, response);
 	}
 
@@ -77,8 +77,7 @@ public class RequestManagementFilter implements Filter {
 
 		Pattern accountManagementPattern = Pattern.compile("^/account/user/[^/]+$");
 
-		// Проверка метода запроса (PUT или DELETE) и соответствия пути шаблону
-		// управления аккаунтами
+	
 		return (HttpMethod.PUT.matches(method) || HttpMethod.DELETE.matches(method))
 				&& accountManagementPattern.matcher(path).matches();
 	}

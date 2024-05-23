@@ -46,7 +46,7 @@ public class AdminManagingRolesFilter implements Filter {
 		if (checkEndpoint(method, path)) {
 
 			String login = request.getUserPrincipal().getName();
-			// Пытаемся найти пользователя в базе данных
+		
 			UserAccount user = null;
 			try {
 				user = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
@@ -67,7 +67,7 @@ public class AdminManagingRolesFilter implements Filter {
 
 			
 		}
-		// Если пользователь администратор, продолжаем выполнение цепочки фильтров
+
 					chain.doFilter(request, response);
 	}
 

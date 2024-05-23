@@ -30,10 +30,7 @@ public class UserAccountingServiceImpl implements UserAccountService, CommandLin
 	
 	@Override
 	public UserDto register(UserRegisterDto userRegisterDto) {
-//		
-//		if (userAccountingRepository.existsById(userRegisterDto.getLogin())) {
-//	        throw new ResponseStatusException(HttpStatus.CONFLICT, "User with email " + userRegisterDto.getLogin() + " already exists");
-//	    }
+
 		if (userAccountingRepository.existsById(userRegisterDto.getLogin())) {
 			throw new UserExistsException();
 		}
