@@ -21,13 +21,14 @@ import telran.java52.accounting.dto.exeption.AccessDeniedException;
 import telran.java52.accounting.model.Role;
 import telran.java52.accounting.model.UserAccount;
 import telran.java52.accounting.service.UserNotFoundException;
+import telran.java52.security.model.User;
 
 @Component
-@RequiredArgsConstructor
+
 @Order(30)
 public class RequestManagementFilter implements Filter {
 
-	final UserAccountingRepository userAccountingRepository;
+	
 
 	@Override
 	public void doFilter(ServletRequest req, ServletResponse resp, FilterChain chain)
@@ -43,15 +44,15 @@ public class RequestManagementFilter implements Filter {
 			try {
 
 				String userName = path.substring(path.lastIndexOf('/') + 1);
-				String login = request.getUserPrincipal().getName();
+				User login = (User)request.getUserPrincipal();
 
-				UserAccount user = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
+				
 
-				if (HttpMethod.PUT.matches(method) && !isOwner(login, userName)) {
+				if (HttpMethod.PUT.matches(method) && !isOwner(login.getName(), userName)) {
 					throw new AccessDeniedException();
 				}
 				if (HttpMethod.DELETE.matches(method)
-						&& !(isOwner(login, userName) || isAdmin(user.getRoles()))) {
+						&& !(isOwner(login.getName(), userName) || isAdmin(login.getRoles()))) {
 					throw new AccessDeniedException();
 				}
 			} catch (UserNotFoundException e) {
@@ -86,7 +87,7 @@ public class RequestManagementFilter implements Filter {
 		return login.equalsIgnoreCase(userName);
 	}
 
-	private boolean isAdmin(Set<Role> roles) {
-		return roles.contains(Role.ADMINISTRATOR);
+	private boolean isAdmin(Set<String> roles) {
+		return roles.contains(Role.ADMINISTRATOR.toString());
 	}
 }

@@ -3,6 +3,8 @@ package telran.java52.security.filter;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.Base64;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.management.loading.PrivateClassLoader;
 
@@ -22,7 +24,9 @@ import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import telran.java52.accounting.dao.UserAccountingRepository;
+import telran.java52.accounting.model.Role;
 import telran.java52.accounting.model.UserAccount;
+import telran.java52.security.model.User;
 
 
 @Component
@@ -35,6 +39,7 @@ public class AuthenticationFilter implements Filter {
 	@Override
 	public void doFilter(ServletRequest req, ServletResponse resp, FilterChain chain)
 			throws IOException, ServletException {
+		
 		HttpServletRequest request = (HttpServletRequest) req;// Преобразование общего ServletRequest в HttpServletRequest
 		HttpServletResponse response = (HttpServletResponse) resp;// Преобразование общего ServletResponse в HttpServletResponse
 		// Проверка, нужно ли применять фильтр для данного запроса
@@ -48,7 +53,10 @@ public class AuthenticationFilter implements Filter {
 				if (!BCrypt.checkpw(credentials[1], userAccount.getPassword())) {
 					throw new RuntimeException();
 				}
-				request = new WrappedRequest(request, userAccount.getLogin());// Создание обертки для запроса с информацией о пользователе
+				Set<String> roles = userAccount.getRoles().stream()
+						.map(Role:: name)
+						.collect(Collectors.toSet());
+				request = new WrappedRequest(request, userAccount.getLogin(),roles);// Создание обертки для запроса с информацией о пользователе
 			} catch (Exception e) {
 				response.sendError(401);
 				return;
@@ -58,7 +66,8 @@ public class AuthenticationFilter implements Filter {
 	}
 
 	private boolean checkEndpoint(String method, String path) {
-		return !(HttpMethod.POST.matches(method) && path.matches("/account/register"));
+		return !(HttpMethod.POST.matches(method) && path.matches(("/account/register"))
+		||path.matches("/forum/posts/\\w+(/\\w+)?"));
 	}// Проверка, если метод POST и путь /account/register, фильтр не применяется
 
 	private String[] getCredentials(String header) {
@@ -70,15 +79,18 @@ public class AuthenticationFilter implements Filter {
 	// Класс обертка для HttpServletRequest
 	private class WrappedRequest extends HttpServletRequestWrapper {
 		private String login;
+		private Set<String> roles;
 
-		public WrappedRequest(HttpServletRequest request, String login) {
+		public WrappedRequest(HttpServletRequest request, String login, Set<String> roles) {
 			super(request);// Вызов конструктора родительского класса
 			this.login = login;// Сохранение логина пользователя
+			this.roles = roles;
 		}
 
 		@Override
 		public Principal getUserPrincipal() {
-			return () -> login;// Возврат Principal с логином пользователя
+//			return () -> login;// Возврат Principal с логином пользователя
+			return new User(login,roles);
 		}
 
 	}

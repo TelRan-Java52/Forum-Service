@@ -25,13 +25,14 @@ import telran.java52.accounting.dto.exeption.AccessDeniedException;
 import telran.java52.accounting.model.Role;
 import telran.java52.accounting.model.UserAccount;
 import telran.java52.accounting.service.UserNotFoundException;
+import telran.java52.security.model.User;
 
 @Component
 @RequiredArgsConstructor
 @Order(20)
 public class AdminManagingRolesFilter implements Filter {
 
-	final UserAccountingRepository userAccountingRepository;
+
 
 	@Override
 	public void doFilter(ServletRequest req, ServletResponse resp, FilterChain chain)
@@ -45,26 +46,15 @@ public class AdminManagingRolesFilter implements Filter {
 
 		if (checkEndpoint(method, path)) {
 
-			String login = request.getUserPrincipal().getName();
+			User login = (User) request.getUserPrincipal();
 		
-			UserAccount user = null;
-			try {
-				user = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
-
-				Set<Role> roles = user.getRoles();
-				if (!isAdmin(roles)) {
-					throw new AccessDeniedException();
+									
+				if (!isAdmin(login.getRoles())) {
+					response.sendError(403);
+					return;
 				}
 
-			} catch (UserNotFoundException e) {
-				response.sendError(HttpServletResponse.SC_NOT_FOUND, "User not found");
-				return;
-			} catch (AccessDeniedException e) {
-				response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient permissions");
-				return;
-
-			}
-
+			
 			
 		}
 
@@ -81,8 +71,8 @@ public class AdminManagingRolesFilter implements Filter {
 	}
 
 	
-	private boolean isAdmin(Set<Role> roles) {
-		return roles.contains(Role.ADMINISTRATOR);
+	private boolean isAdmin(Set<String> roles) {
+		return roles.contains(Role.ADMINISTRATOR.toString());
 	}
 
 }
