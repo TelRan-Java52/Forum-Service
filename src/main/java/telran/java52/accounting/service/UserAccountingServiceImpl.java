@@ -3,11 +3,13 @@ package telran.java52.accounting.service;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.mindrot.jbcrypt.BCrypt;
+
 import org.modelmapper.ModelMapper;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -19,88 +21,94 @@ import telran.java52.accounting.dto.UserDto;
 import telran.java52.accounting.dto.UserEditDto;
 import telran.java52.accounting.dto.UserRegisterDto;
 import telran.java52.accounting.dto.exeption.IncorrectRoleExeption;
+import telran.java52.accounting.model.Role;
 import telran.java52.accounting.model.UserAccount;
 
 @Service
 @RequiredArgsConstructor
-public class UserAccountingServiceImpl implements UserAccountService {
+public class UserAccountingServiceImpl implements UserAccountService, CommandLineRunner {
+
 	final UserAccountingRepository userAccountingRepository;
 	final ModelMapper modelMapper;
-	
+	final PasswordEncoder passwordEncoder;
+
 	@Override
 	public UserDto register(UserRegisterDto userRegisterDto) {
-		
 		if (userAccountingRepository.existsById(userRegisterDto.getLogin())) {
-	        throw new ResponseStatusException(HttpStatus.CONFLICT, "User with email " + userRegisterDto.getLogin() + " already exists");
-	    }
-		UserAccount user = modelMapper.map(userRegisterDto, UserAccount.class);
-          String password = BCrypt.hashpw(userRegisterDto.getPassword(), BCrypt.gensalt());
-		   user.setPassword(password);
-          user = userAccountingRepository.save(user);
-           return  modelMapper.map(user, UserDto.class);
-
-		
+			throw new UserExistsException();
+		}
+		UserAccount userAccount = modelMapper.map(userRegisterDto, UserAccount.class);
+		String password = passwordEncoder.encode(userRegisterDto.getPassword());
+		userAccount.setPassword(password);
+		userAccountingRepository.save(userAccount);
+		return modelMapper.map(userAccount, UserDto.class);
 	}
 
 	@Override
 	public UserDto getUser(String login) {
-		UserAccount user = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
-		return modelMapper.map(user, UserDto.class);
-		
+		UserAccount userAccount = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
+		return modelMapper.map(userAccount, UserDto.class);
 	}
 
 	@Override
 	public UserDto removeUser(String login) {
-		UserAccount user = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
-		userAccountingRepository.deleteById(login);
-		return modelMapper.map(user, UserDto.class);
+		UserAccount userAccount = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
+		userAccountingRepository.delete(userAccount);
+		return modelMapper.map(userAccount, UserDto.class);
 	}
 
 	@Override
 	public UserDto updateUser(String login, UserEditDto userEditDto) {
-		UserAccount user = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
-		String lastName = userEditDto.getLastName();
-		if (lastName != null) {
-			user.setLastName(lastName);
+		UserAccount userAccount = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
+		if (userEditDto.getFirstName() != null) {
+			userAccount.setFirstName(userEditDto.getFirstName());
 		}
-		String firstName = userEditDto.getFirstName();
-		if (firstName != null) {
-			user.setFirstName(firstName);
+		if (userEditDto.getLastName() != null) {
+			userAccount.setLastName(userEditDto.getLastName());
 		}
-		user = userAccountingRepository.save(user);
-		return modelMapper.map(user, UserDto.class);
-	
+		userAccountingRepository.save(userAccount);
+		return modelMapper.map(userAccount, UserDto.class);
 	}
 
 	@Override
 	public RolesDto changeRolesList(String login, String role, boolean isAddRole) {
-		UserAccount user = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
+		UserAccount userAccount = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
+		boolean res;
 		try {
-		    if (isAddRole) {
-		        user.addRole(role);
-		    } else {
-		        user.removeRole(role);
-		    }
+			if (isAddRole) {
+				res = userAccount.addRole(role);
+			} else {
+				res = userAccount.removeRole(role);
+			}
 		} catch (Exception e) {
-		    throw new IncorrectRoleExeption();
+			throw new IncorrectRoleExeption();
 		}
-		userAccountingRepository.save(user);
-		Set<String> roleSet = user.getRoles().stream().map(r -> r.toString()).collect(Collectors.toSet());
-		return new RolesDto(login, roleSet);
+		if (res) {
+			userAccountingRepository.save(userAccount);
+		}
+		return modelMapper.map(userAccount, RolesDto.class);
 	}
 
 	@Override
 	public void changePassword(String login, String newPassword) {
-		UserAccount user = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
-		if (user == null) {
-			throw new RuntimeException("User not found");
+		UserAccount userAccount = userAccountingRepository.findById(login).orElseThrow(UserNotFoundException::new);
+		String password = passwordEncoder.encode(newPassword);
+		userAccount.setPassword(password);
+		userAccountingRepository.save(userAccount);
+	}
+
+	@Override
+	public void run(String... args) throws Exception {
+		if(!userAccountingRepository.existsById("admin")) {
+			String password = passwordEncoder.encode("admin");
+			UserAccount userAccount = new UserAccount("admin", "", "", password );
+			userAccount.addRole(Role.MODERATOR.name());
+			userAccount.addRole(Role.ADMINISTRATOR.name());
+			userAccountingRepository.save(userAccount);
 		}
-		String password = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-		user.setPassword(newPassword);
-
-		userAccountingRepository.save(user);
 	}
 
+	
+		
 	}
-
 

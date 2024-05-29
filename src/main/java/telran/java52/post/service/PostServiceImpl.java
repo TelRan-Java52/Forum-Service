@@ -101,4 +101,10 @@ public class PostServiceImpl implements PostService {
 				.toList();
 	}
 
+	@Override
+	public boolean isAuthor(String postId, String login) {
+		Post post = postRepository.findById(postId).orElseThrow(PostNotFoundException::new);
+		return post.getAuthor().equalsIgnoreCase(login);
+	}
+
 }

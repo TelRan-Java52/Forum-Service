@@ -26,4 +26,5 @@ public interface PostService {
 
 	Iterable<PostDto> findPostsByPeriod(DatePeriodDto datePeriodDto);
 
+	 boolean isAuthor(String postId, String login);
 }
