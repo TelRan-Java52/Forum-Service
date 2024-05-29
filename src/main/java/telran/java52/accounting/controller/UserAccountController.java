@@ -68,5 +68,4 @@ public class UserAccountController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void changePassword(Principal principal, @RequestHeader("X-Password") String newPassword) {
 		userAccountService.changePassword(principal.getName(), newPassword);
-	}
-}
+	}}
